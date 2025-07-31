@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from datetime import datetime
 
 st.set_page_config(layout="wide", page_title="Crypto Global Dashboard", page_icon="📊")
@@ -10,19 +11,22 @@ st.set_page_config(layout="wide", page_title="Crypto Global Dashboard", page_ico
 
 @st.cache_data(ttl=600)
 def get_global_data():
-    url = "https://api.coingecko.com/api/v3/global"
-    return requests.get(url).json()["data"]
+    return requests.get("https://api.coingecko.com/api/v3/global").json()["data"]
 
 @st.cache_data(ttl=600)
 def get_btc_market_cap(days="7"):
     url = f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days={days}"
-    response = requests.get(url).json()
-    return response["market_caps"]
+    return requests.get(url).json()["market_caps"]
 
 @st.cache_data(ttl=600)
 def get_top_market_data():
     url = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1"
     return requests.get(url).json()
+
+@st.cache_data(ttl=300)
+def get_fear_greed_index():
+    url = "https://api.alternative.me/fng/"
+    return requests.get(url).json()["data"][0]
 
 # ------------------- Helpers -------------------
 
@@ -34,6 +38,15 @@ def format_number(n):
     else:
         return f"${n:,.2f}"
 
+def get_fg_color(label):
+    return {
+        "Extreme Fear": "red",
+        "Fear": "orange",
+        "Neutral": "gray",
+        "Greed": "lightgreen",
+        "Extreme Greed": "green"
+    }.get(label, "gray")
+
 # ------------------- Load Data -------------------
 
 global_data = get_global_data()
@@ -43,14 +56,23 @@ btc_dominance = global_data["market_cap_percentage"]["btc"]
 eth_dominance = global_data["market_cap_percentage"]["eth"]
 others = 100 - btc_dominance - eth_dominance
 
-# ------------------- Header Stats -------------------
+fear_data = get_fear_greed_index()
+fg_value = int(fear_data["value"])
+fg_label = fear_data["value_classification"]
+fg_color = get_fg_color(fg_label)
+
+# ------------------- Header Section -------------------
 
 st.title("📊 Global Crypto Dashboard")
 
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 col1.metric("🌐 Global Market Cap", format_number(market_cap))
 col2.metric("💸 24H Volume", format_number(volume))
 col3.metric("📈 BTC Dominance", f"{btc_dominance:.2f}%")
+col4.markdown(f"""
+### 🧠 Fear & Greed Index  
+<span style='font-size:32px; color:{fg_color}; font-weight:bold'>{fg_value} – {fg_label}</span>
+""", unsafe_allow_html=True)
 
 # ------------------- Global Market Cap Chart -------------------
 
@@ -70,31 +92,24 @@ days = time_ranges[selected_range]
 
 btc_caps = get_btc_market_cap(days)
 btc_dominance_fraction = btc_dominance / 100
-
-# Estimate global market cap using BTC dominance
 global_caps = [[t, btc / btc_dominance_fraction] for t, btc in btc_caps]
 df_global = pd.DataFrame(global_caps, columns=["timestamp", "global_market_cap"])
 df_global["timestamp"] = pd.to_datetime(df_global["timestamp"], unit="ms")
 df_global.set_index("timestamp", inplace=True)
 
-# Show chart with grid from $2T to $5T
-import matplotlib.ticker as ticker
-
+# Plot using matplotlib with fixed Y-axis from $2.5T to $5T
 fig, ax = plt.subplots()
 ax.plot(df_global.index, df_global["global_market_cap"], color='royalblue', linewidth=2)
-ax.set_title("Estimated Global Market Cap")
-ax.set_ylabel("USD ($)")
-ax.set_ylim(2.5e12, 5e12)  # Set Y-axis from 2.5T to 5T
-
-# Format Y-axis labels as trillions
+ax.set_title("Estimated Global Market Cap", fontsize=14)
+ax.set_ylabel("USD")
+ax.set_ylim(2.5e12, 5e12)
 formatter = ticker.FuncFormatter(lambda x, _: f"${x/1e12:.1f}T")
 ax.yaxis.set_major_formatter(formatter)
-
 ax.grid(True, linestyle='--', alpha=0.4)
 fig.autofmt_xdate()
 st.pyplot(fig)
 
-st.caption("🧮 Global market cap is estimated from BTC market cap and current BTC dominance.")
+st.caption("🧮 Global market cap is estimated from BTC market cap and BTC dominance.")
 
 # ------------------- Market Dominance Pie Chart -------------------
 
