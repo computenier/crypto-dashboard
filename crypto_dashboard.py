@@ -78,7 +78,21 @@ df_global["timestamp"] = pd.to_datetime(df_global["timestamp"], unit="ms")
 df_global.set_index("timestamp", inplace=True)
 
 # Show chart with grid from $2T to $5T
-st.line_chart(df_global["global_market_cap"])
+import matplotlib.ticker as ticker
+
+fig, ax = plt.subplots()
+ax.plot(df_global.index, df_global["global_market_cap"], color='royalblue', linewidth=2)
+ax.set_title("Estimated Global Market Cap")
+ax.set_ylabel("USD ($)")
+ax.set_ylim(2.5e12, 5e12)  # Set Y-axis from 2.5T to 5T
+
+# Format Y-axis labels as trillions
+formatter = ticker.FuncFormatter(lambda x, _: f"${x/1e12:.1f}T")
+ax.yaxis.set_major_formatter(formatter)
+
+ax.grid(True, linestyle='--', alpha=0.4)
+fig.autofmt_xdate()
+st.pyplot(fig)
 
 st.caption("🧮 Global market cap is estimated from BTC market cap and current BTC dominance.")
 
