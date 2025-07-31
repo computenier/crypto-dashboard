@@ -14,10 +14,10 @@ def get_global_data():
     return response['data']
 
 @st.cache_data(ttl=300)
-def get_market_cap_chart():
-    url = "https://api.coingecko.com/api/v3/global/market_cap_chart?vs_currency=usd&days=1"
+def get_btc_price_chart():
+    url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1"
     response = requests.get(url).json()
-    return response['market_cap']
+    return response['prices']
 
 # --- Format numbers ---
 def format_number(n):
@@ -42,12 +42,12 @@ col1, col2 = st.columns(2)
 col1.metric("🌐 Global Market Cap", format_number(market_cap))
 col2.metric("💸 24H Volume", format_number(volume))
 
-# --- Chart: Market Cap 24H ---
-st.subheader("📈 Market Cap (Last 24H)")
-chart_data = get_market_cap_chart()
-df = pd.DataFrame(chart_data, columns=['timestamp', 'market_cap'])
-df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-df.set_index('timestamp', inplace=True)
+# --- Chart: Bitcoin Price 24H ---
+st.subheader("📈 Bitcoin Price (Last 24H)")
+price_data = get_btc_price_chart()
+df = pd.DataFrame(price_data, columns=["timestamp", "price"])
+df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+df.set_index("timestamp", inplace=True)
 st.line_chart(df)
 
 # --- Chart: Market Dominance ---
