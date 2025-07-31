@@ -6,6 +6,7 @@ import matplotlib.ticker as ticker
 from datetime import datetime
 import random
 from pytrends.request import TrendReq
+import numpy as np
 
 st.set_page_config(page_title="Crypto Dashboard", layout="wide")
 
@@ -129,7 +130,6 @@ col5.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ------------------- Global Market Cap Chart -------------------
-
 st.markdown("<div class='section-header'>📈 Estimated Global Market Cap</div>", unsafe_allow_html=True)
 time_ranges = {
     "24H": "1", "7D": "7", "14D": "14", "1M": "30", "3M": "90", "1Y": "365", "All": "max"
@@ -143,14 +143,19 @@ df_global = pd.DataFrame(global_caps, columns=["timestamp", "global_market_cap"]
 df_global["timestamp"] = pd.to_datetime(df_global["timestamp"], unit="ms")
 df_global.set_index("timestamp", inplace=True)
 
-fig, ax = plt.subplots()
-ax.plot(df_global.index, df_global["global_market_cap"], color='royalblue', linewidth=2)
-ax.set_title("Estimated Global Market Cap", fontsize=14)
+fig, ax = plt.subplots(figsize=(10, 4))
+ax.plot(df_global.index, df_global["global_market_cap"], color='#007aff', linewidth=2.5)
+ax.set_title("Estimated Global Market Cap", fontsize=16, fontweight='bold')
 ax.set_ylabel("USD")
-ax.set_ylim(2.5e12, 5e12)
+
+# Dynamic range based on data, not starting from 0
+y_min = max(2e12, df_global["global_market_cap"].min() * 0.95)
+y_max = df_global["global_market_cap"].max() * 1.05
+ax.set_ylim(y_min, y_max)
+
 formatter = ticker.FuncFormatter(lambda x, _: f"${x/1e12:.1f}T")
 ax.yaxis.set_major_formatter(formatter)
-ax.grid(True, linestyle='--', alpha=0.4)
+ax.grid(True, linestyle='--', alpha=0.3)
 fig.autofmt_xdate()
 st.pyplot(fig)
 
@@ -164,3 +169,26 @@ try:
 except Exception as e:
     st.warning("⚠️ Could not fetch Google Trends data.")
     st.text(str(e))
+
+# ------------------- Market Dominance Pie Chart -------------------
+st.markdown("<div class='section-header'>📊 Market Dominance Breakdown</div>", unsafe_allow_html=True)
+filter_option = st.selectbox("Select filter:", [
+    "BTC vs ETH vs Others",
+    "BTC vs Altcoins (excluding top 5)"
+])
+
+if filter_option == "BTC vs ETH vs Others":
+    labels = ["BTC", "ETH", "Others"]
+    values = [btc_dominance, eth_dominance, others]
+else:
+    top_5_ids = ["bitcoin", "ethereum", "tether", "bnb", "solana"]
+    coin_data = get_top_market_data()
+    altcoins = [c for c in coin_data if c["id"] not in top_5_ids]
+    alt_dominance = sum(c["market_cap"] for c in altcoins) / market_cap * 100
+    labels = ["BTC", "Altcoins (excl. Top 5)"]
+    values = [btc_dominance, alt_dominance]
+
+fig, ax = plt.subplots()
+ax.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
+ax.axis("equal")
+st.pyplot(fig)
