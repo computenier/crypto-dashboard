@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from datetime import datetime
+import random
 
 st.set_page_config(layout="wide", page_title="Crypto Global Dashboard", page_icon="📊")
 
@@ -27,6 +28,16 @@ def get_top_market_data():
 def get_fear_greed_index():
     url = "https://api.alternative.me/fng/"
     return requests.get(url).json()["data"][0]
+
+def get_flex_sentiment():
+    flex_levels = [
+        {"label": "Low Flex", "emoji": "🧢", "color": "gray"},
+        {"label": "Mild Flex", "emoji": "🕶️", "color": "blue"},
+        {"label": "Crypto Bros Warming Up", "emoji": "⌚", "color": "orange"},
+        {"label": "Lambo Watch Out", "emoji": "🚗", "color": "red"},
+        {"label": "Full Degens Activated", "emoji": "🛥️", "color": "purple"},
+    ]
+    return random.choice(flex_levels)
 
 # ------------------- Helpers -------------------
 
@@ -61,17 +72,27 @@ fg_value = int(fear_data["value"])
 fg_label = fear_data["value_classification"]
 fg_color = get_fg_color(fg_label)
 
+flex = get_flex_sentiment()
+
 # ------------------- Header Section -------------------
 
 st.title("📊 Global Crypto Dashboard")
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("🌐 Global Market Cap", format_number(market_cap))
+col1, col2, col3, col4, col5 = st.columns(5)
+col1.metric("🌐 Market Cap", format_number(market_cap))
 col2.metric("💸 24H Volume", format_number(volume))
 col3.metric("📈 BTC Dominance", f"{btc_dominance:.2f}%")
+
+# Fear & Greed Index
 col4.markdown(f"""
-### 🧠 Fear & Greed Index  
-<span style='font-size:32px; color:{fg_color}; font-weight:bold'>{fg_value} – {fg_label}</span>
+### 🧠 Fear & Greed  
+<span style='font-size:30px; color:{fg_color}; font-weight:bold'>{fg_value} – {fg_label}</span>
+""", unsafe_allow_html=True)
+
+# Flex Sentiment
+col5.markdown(f"""
+### 💸 Flex Sentiment  
+<span style='font-size:30px; color:{flex['color']}; font-weight:bold'>{flex['emoji']} {flex['label']}</span>
 """, unsafe_allow_html=True)
 
 # ------------------- Global Market Cap Chart -------------------
@@ -97,7 +118,6 @@ df_global = pd.DataFrame(global_caps, columns=["timestamp", "global_market_cap"]
 df_global["timestamp"] = pd.to_datetime(df_global["timestamp"], unit="ms")
 df_global.set_index("timestamp", inplace=True)
 
-# Plot using matplotlib with fixed Y-axis from $2.5T to $5T
 fig, ax = plt.subplots()
 ax.plot(df_global.index, df_global["global_market_cap"], color='royalblue', linewidth=2)
 ax.set_title("Estimated Global Market Cap", fontsize=14)
@@ -109,7 +129,7 @@ ax.grid(True, linestyle='--', alpha=0.4)
 fig.autofmt_xdate()
 st.pyplot(fig)
 
-st.caption("🧮 Global market cap is estimated from BTC market cap and BTC dominance.")
+st.caption("🧮 Global market cap is estimated from BTC market cap and current BTC dominance.")
 
 # ------------------- Market Dominance Pie Chart -------------------
 
