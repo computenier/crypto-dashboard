@@ -5,11 +5,33 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from datetime import datetime
 import random
+from pytrends.request import TrendReq
 
-st.set_page_config(layout="wide", page_title="Crypto Global Dashboard", page_icon="📊")
+st.set_page_config(page_title="Crypto Dashboard", layout="wide")
 
-# ------------------- API Functions -------------------
+# CSS Styling
+st.markdown("""
+    <style>
+    html, body, [class*="css"]  {
+        font-family: "-apple-system", "system-ui", "Segoe UI", Roboto, sans-serif;
+    }
+    .metric-container {
+        padding: 1.5rem;
+        background: #f8f9fa;
+        border-radius: 1rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        text-align: center;
+    }
+    .section-header {
+        font-size: 1.4rem;
+        font-weight: 600;
+        padding: 1rem 0 0.5rem;
+        color: #222;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
+# ------------------- Data Functions -------------------
 @st.cache_data(ttl=600)
 def get_global_data():
     return requests.get("https://api.coingecko.com/api/v3/global").json()["data"]
@@ -39,8 +61,7 @@ def get_flex_sentiment():
     ]
     return random.choice(flex_levels)
 
-# ------------------- Helpers -------------------
-
+# ------------------- Format Helpers -------------------
 def format_number(n):
     if n >= 1e12:
         return f"${n / 1e12:.2f}T"
@@ -59,7 +80,6 @@ def get_fg_color(label):
     }.get(label, "gray")
 
 # ------------------- Load Data -------------------
-
 global_data = get_global_data()
 market_cap = global_data["total_market_cap"]["usd"]
 volume = global_data["total_volume"]["usd"]
@@ -67,49 +87,54 @@ btc_dominance = global_data["market_cap_percentage"]["btc"]
 eth_dominance = global_data["market_cap_percentage"]["eth"]
 others = 100 - btc_dominance - eth_dominance
 
-fear_data = get_fear_greed_index()
-fg_value = int(fear_data["value"])
-fg_label = fear_data["value_classification"]
+fg_data = get_fear_greed_index()
+fg_value = int(fg_data["value"])
+fg_label = fg_data["value_classification"]
 fg_color = get_fg_color(fg_label)
 
 flex = get_flex_sentiment()
 
 # ------------------- Header Section -------------------
-
-st.title("📊 Global Crypto Dashboard")
+st.markdown("<h1 style='margin-bottom: 1rem;'>🌐 Crypto Market Overview</h1>", unsafe_allow_html=True)
 
 col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("🌐 Market Cap", format_number(market_cap))
-col2.metric("💸 24H Volume", format_number(volume))
-col3.metric("📈 BTC Dominance", f"{btc_dominance:.2f}%")
-
-# Fear & Greed Index
-col4.markdown(f"""
-### 🧠 Fear & Greed  
-<span style='font-size:30px; color:{fg_color}; font-weight:bold'>{fg_value} – {fg_label}</span>
+col1.markdown(f"""
+    <div class='metric-container'>
+    <h3>Market Cap</h3><p>{format_number(market_cap)}</p>
+    </div>
 """, unsafe_allow_html=True)
 
-# Flex Sentiment
+col2.markdown(f"""
+    <div class='metric-container'>
+    <h3>24H Volume</h3><p>{format_number(volume)}</p>
+    </div>
+""", unsafe_allow_html=True)
+
+col3.markdown(f"""
+    <div class='metric-container'>
+    <h3>BTC Dominance</h3><p>{btc_dominance:.2f}%</p>
+    </div>
+""", unsafe_allow_html=True)
+
+col4.markdown(f"""
+    <div class='metric-container'>
+    <h3>Fear & Greed</h3><p style='color:{fg_color}; font-weight:bold'>{fg_value} – {fg_label}</p>
+    </div>
+""", unsafe_allow_html=True)
+
 col5.markdown(f"""
-### 💸 Flex Sentiment  
-<span style='font-size:30px; color:{flex['color']}; font-weight:bold'>{flex['emoji']} {flex['label']}</span>
+    <div class='metric-container'>
+    <h3>Flex Meter</h3><p style='color:{flex['color']}; font-weight:bold'>{flex['emoji']} {flex['label']}</p>
+    </div>
 """, unsafe_allow_html=True)
 
 # ------------------- Global Market Cap Chart -------------------
 
-st.subheader("📈 Estimated Global Market Cap Over Time")
-
+st.markdown("<div class='section-header'>📈 Estimated Global Market Cap</div>", unsafe_allow_html=True)
 time_ranges = {
-    "24H": "1",
-    "7D": "7",
-    "14D": "14",
-    "1M": "30",
-    "3M": "90",
-    "1Y": "365",
-    "All": "max"
+    "24H": "1", "7D": "7", "14D": "14", "1M": "30", "3M": "90", "1Y": "365", "All": "max"
 }
-selected_range = st.selectbox("Select time range:", list(time_ranges.keys()))
-days = time_ranges[selected_range]
+days = time_ranges[st.selectbox("Time range:", list(time_ranges.keys()), index=1)]
 
 btc_caps = get_btc_market_cap(days)
 btc_dominance_fraction = btc_dominance / 100
@@ -129,29 +154,13 @@ ax.grid(True, linestyle='--', alpha=0.4)
 fig.autofmt_xdate()
 st.pyplot(fig)
 
-st.caption("🧮 Global market cap is estimated from BTC market cap and current BTC dominance.")
-
-# ------------------- Market Dominance Pie Chart -------------------
-
-st.subheader("📊 Market Dominance Breakdown")
-
-filter_option = st.selectbox("Select filter", [
-    "BTC vs ETH vs Others",
-    "BTC vs Altcoins (excluding top 5)"
-])
-
-if filter_option == "BTC vs ETH vs Others":
-    labels = ["BTC", "ETH", "Others"]
-    values = [btc_dominance, eth_dominance, others]
-else:
-    top_5_ids = ["bitcoin", "ethereum", "tether", "bnb", "solana"]
-    coin_data = get_top_market_data()
-    altcoins = [c for c in coin_data if c["id"] not in top_5_ids]
-    alt_dominance = sum(c["market_cap"] for c in altcoins) / market_cap * 100
-    labels = ["BTC", "Altcoins (excl. Top 5)"]
-    values = [btc_dominance, alt_dominance]
-
-fig, ax = plt.subplots()
-ax.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
-ax.axis("equal")
-st.pyplot(fig)
+# ------------------- Rolex Google Trends -------------------
+st.markdown("<div class='section-header'>💎 Rolex Crypto (Google Trends)</div>", unsafe_allow_html=True)
+try:
+    pytrends = TrendReq(hl='en-US', tz=360)
+    pytrends.build_payload(["Rolex Crypto"], timeframe='now 7-d')
+    df_trend = pytrends.interest_over_time().drop(columns=['isPartial'])
+    st.line_chart(df_trend)
+except Exception as e:
+    st.warning("⚠️ Could not fetch Google Trends data.")
+    st.text(str(e))
