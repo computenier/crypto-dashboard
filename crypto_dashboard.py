@@ -7,17 +7,17 @@ from datetime import datetime
 st.set_page_config(layout="wide", page_title="Crypto Global Dashboard", page_icon="📊")
 
 # --- Fetch Global Stats ---
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=600)
 def get_global_data():
     url = "https://api.coingecko.com/api/v3/global"
     response = requests.get(url).json()
     return response['data']
 
-@st.cache_data(ttl=300)
-def get_btc_price_chart():
-    url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=1"
+@st.cache_data(ttl=600)
+def get_btc_market_cap(days=7):
+    url = f"https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days={days}"
     response = requests.get(url).json()
-    return response['prices']
+    return response['market_caps']
 
 # --- Format numbers ---
 def format_number(n):
@@ -28,7 +28,7 @@ def format_number(n):
     else:
         return f"${n:,.2f}"
 
-# --- Layout ---
+# --- Main App ---
 st.title("📊 Global Crypto Dashboard")
 
 data = get_global_data()
@@ -38,17 +38,18 @@ btc_dominance = data['market_cap_percentage']['btc']
 eth_dominance = data['market_cap_percentage']['eth']
 others = 100 - btc_dominance - eth_dominance
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 col1.metric("🌐 Global Market Cap", format_number(market_cap))
 col2.metric("💸 24H Volume", format_number(volume))
+col3.metric("📈 BTC Dominance", f"{btc_dominance:.2f}%")
 
-# --- Chart: Bitcoin Price 24H ---
-st.subheader("📈 Bitcoin Price (Last 24H)")
-price_data = get_btc_price_chart()
-df = pd.DataFrame(price_data, columns=["timestamp", "price"])
-df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
-df.set_index("timestamp", inplace=True)
-st.line_chart(df)
+# --- Chart: Bitcoin Market Cap Trend ---
+st.subheader("📈 Bitcoin Market Cap (Last 7 Days)")
+btc_chart = get_btc_market_cap(days=7)
+df_btc = pd.DataFrame(btc_chart, columns=["timestamp", "market_cap"])
+df_btc["timestamp"] = pd.to_datetime(df_btc["timestamp"], unit="ms")
+df_btc.set_index("timestamp", inplace=True)
+st.line_chart(df_btc["market_cap"])
 
 # --- Chart: Market Dominance ---
 st.subheader("📊 Market Dominance")
@@ -63,7 +64,6 @@ if filter_option == "BTC vs ETH vs Others":
     labels = ["BTC", "ETH", "Others"]
     values = [btc_dominance, eth_dominance, others]
 else:
-    # Exclude top 5 by default
     top_5_ids = ["bitcoin", "ethereum", "tether", "bnb", "solana"]
     coin_data = requests.get(
         "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1"
