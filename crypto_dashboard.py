@@ -206,11 +206,15 @@ from tradingview_ta import TA_Handler, Interval
 interval_map = {
     "1h": Interval.INTERVAL_1_HOUR,
     "4h": Interval.INTERVAL_4_HOURS,
-    "1d": Interval.INTERVAL_1_DAY
+    "1d": Interval.INTERVAL_1_DAY,
+    "7d": Interval.INTERVAL_1_WEEK,
+    "1mo": Interval.INTERVAL_1_MONTH,
+    "3mo": Interval.INTERVAL_3_MONTHS,
+    "1y": Interval.INTERVAL_1_YEAR
 }
 
 # Timeframe selection
-selected_interval = st.selectbox("Select timeframe", ["1h", "4h", "1d"], index=2)
+selected_interval = st.selectbox("Select timeframe", list(interval_map.keys()), index=2)
 selected_tv_interval = interval_map[selected_interval]
 
 @st.cache_data(ttl=600)
