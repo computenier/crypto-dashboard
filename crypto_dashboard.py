@@ -263,19 +263,29 @@ def get_average_sentiment(symbol, exchange):
 def get_binance_long_short_ratio(symbol="BTCUSDT"):
     url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={symbol}&period=5m&limit=10"
     try:
-        response = requests.get(url).json()
+        response = requests.get(url)
+        if response.status_code != 200:
+            st.error(f"Binance API returned {response.status_code}")
+            return None
+
+        json_data = response.json()
+        if not isinstance(json_data, list):
+            st.error("Unexpected Binance response format.")
+            return None
+
         data = [
             {
                 "time": datetime.fromtimestamp(int(d["timestamp"]) / 1000),
                 "long": float(d["longAccountRatio"]),
                 "short": float(d["shortAccountRatio"])
             }
-            for d in response
+            for d in json_data
         ]
-        df = pd.DataFrame(data)
-        return df
-    except:
+        return pd.DataFrame(data)
+    except Exception as e:
+        st.error(f"Error fetching Binance data: {e}")
         return None
+
 
 # Define coins and exchange
 assets = [
@@ -323,3 +333,4 @@ if df_ratio is not None:
     st.markdown(f"**Flex Signal:** {emoji}")
 else:
     st.warning("Unable to fetch Binance sentiment ratio.")
+
