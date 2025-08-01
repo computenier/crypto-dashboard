@@ -4,3 +4,5 @@ matplotlib
 requests
 tradingview_ta
 pytrends
+beautifulsoup4
+lxml
