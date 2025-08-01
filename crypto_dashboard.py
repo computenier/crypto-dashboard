@@ -223,15 +223,20 @@ returns_filtered = day_returns.dropna(subset=["Monday", "Sunday", "Friday", "Thu
 mon_diff = (returns_filtered["Monday"] - returns_filtered["Sunday"]) * 100
 fri_diff = (returns_filtered["Friday"] - returns_filtered["Thursday"]) * 100
 
-# Plotting chart
-fig, ax = plt.subplots(figsize=(10, 4))
-ax.plot(mon_diff.index.to_timestamp(), mon_diff, label="Monday vs Sunday", color="green")
-ax.plot(fri_diff.index.to_timestamp(), fri_diff, label="Friday vs Thursday", color="red")
-ax.axhline(0, color="gray", linestyle="--", linewidth=1)
-ax.set_title("% Return Difference on Key Days (1 Year)", fontsize=14)
+# Bar chart comparison of average differences
+avg_mon_diff = mon_diff.mean()
+avg_fri_diff = fri_diff.mean()
+
+fig, ax = plt.subplots(figsize=(6, 4))
+labels = ["Mon vs Sun", "Fri vs Thu"]
+values = [avg_mon_diff, avg_fri_diff]
+colors = ["green" if v >= 0 else "red" for v in values]
+
+ax.bar(labels, values, color=colors)
+ax.axhline(0, color="gray", linestyle="--")
 ax.set_ylabel("% Change")
-ax.legend()
-ax.grid(True, alpha=0.3)
+ax.set_title("Average Weekly Return Comparison")
+ax.grid(True, axis="y", linestyle="--", alpha=0.3)
 st.pyplot(fig)
 
 # Summary
@@ -239,4 +244,4 @@ st.markdown("""
 **Summary of average 1-year weekly pattern:**
 - 📈 **Avg Monday vs Sunday**: {:.2f}%
 - 📉 **Avg Friday vs Thursday**: {:.2f}%
-""".format(mon_diff.mean(), fri_diff.mean()))
+""".format(avg_mon_diff, avg_fri_diff))
