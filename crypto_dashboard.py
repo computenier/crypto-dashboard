@@ -204,24 +204,21 @@ import requests
 import matplotlib.pyplot as plt
 import pandas as pd
 from tradingview_ta import TA_Handler, Interval
+from collections import Counter
 
 st.markdown("<div class='section-header'>📉 TradingView Technical Sentiment</div>", unsafe_allow_html=True)
 
 # Map human labels to TradingView TA interval enums
-# Note: TradingView TA does not natively support 3-month or 1-year intervals.
-# These are mapped to '1mo' as a fallback approximation.
 interval_map = {
     "1h": Interval.INTERVAL_1_HOUR,
     "4h": Interval.INTERVAL_4_HOURS,
     "1d": Interval.INTERVAL_1_DAY,
     "7d": Interval.INTERVAL_1_WEEK,
-    "1mo": Interval.INTERVAL_1_MONTH,
-    "3mo": Interval.INTERVAL_1_MONTH,  # Fallback for 3mo
-    "1y": Interval.INTERVAL_1_MONTH     # Fallback for 1y
+    "1mo": Interval.INTERVAL_1_MONTH
 }
 
 # Timeframe selection (sorted from short to long)
-ordered_intervals = ["1h", "4h", "1d", "7d", "1mo", "3mo", "1y"]
+ordered_intervals = ["1h", "4h", "1d", "7d", "1mo"]
 selected_interval = st.selectbox("Select timeframe", ordered_intervals, index=2)
 selected_tv_interval = interval_map[selected_interval]
 
@@ -247,6 +244,20 @@ def get_sentiment(symbol, exchange, interval):
             "ma": "N/A"
         }
 
+# New: average sentiment function
+@st.cache_data(ttl=600)
+def get_average_sentiment(symbol, exchange):
+    votes = []
+    for intv in ordered_intervals:
+        tv_intv = interval_map[intv]
+        s = get_sentiment(symbol, exchange, tv_intv)["summary"]
+        if s != "N/A":
+            votes.append(s)
+    if votes:
+        most_common = Counter(votes).most_common(1)[0][0]
+        return most_common
+    return "N/A"
+
 # Define coins and exchange
 assets = [
     {"label": "BTC/USD", "symbol": "BTCUSD", "exchange": "COINBASE"},
@@ -271,10 +282,13 @@ def draw_gauge(title, value):
 for asset in assets:
     st.subheader(f"📊 {asset['label']} ({selected_interval})")
     sentiment = get_sentiment(asset["symbol"], asset["exchange"], selected_tv_interval)
-    col1, col2, col3 = st.columns(3)
+    avg_signal = get_average_sentiment(asset["symbol"], asset["exchange"])
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.pyplot(draw_gauge("Summary", sentiment["summary"]))
     with col2:
         st.pyplot(draw_gauge("Oscillators", sentiment["oscillators"]))
     with col3:
         st.pyplot(draw_gauge("Moving Averages", sentiment["ma"]))
+    with col4:
+        st.pyplot(draw_gauge("Avg Signal", avg_signal))
