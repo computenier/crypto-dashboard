@@ -197,51 +197,61 @@ with col2:
     ax2.axis("equal")
     st.pyplot(fig2)
 
-# ------------------- BTC Day-of-Week Return Analysis -------------------
-st.markdown("<div class='section-header'>📊 Weekly Price Pattern Analysis</div>", unsafe_allow_html=True)
+# ------------------- Technical Indicator Gauge -------------------
+st.markdown("<div class='section-header'>📉 TradingView Technical Sentiment</div>", unsafe_allow_html=True)
 
-@st.cache_data(ttl=86400)
-def get_btc_daily_1year():
-    url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365"
-    data = requests.get(url).json()
-    prices = data["prices"]
-    df = pd.DataFrame(prices, columns=["timestamp", "price"])
-    df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
-    df.set_index("date", inplace=True)
-    df = df[["price"]].resample("D").mean().dropna()
-    df["return"] = df["price"].pct_change()
-    df["weekday"] = df.index.day_name()
-    df["week"] = df.index.to_period("W")
-    return df
+from tradingview_ta import TA_Handler, Interval
 
-df_btc = get_btc_daily_1year()
+@st.cache_data(ttl=3600)
+def get_sentiment(symbol, exchange):
+    handler = TA_Handler(
+        symbol=symbol,
+        screener="crypto",
+        exchange=exchange,
+        interval=Interval.INTERVAL_1_DAY
+    )
+    try:
+        analysis = handler.get_analysis()
+        return {
+            "summary": analysis.summary["RECOMMENDATION"],
+            "oscillators": analysis.oscillators["RECOMMENDATION"],
+            "ma": analysis.moving_averages["RECOMMENDATION"]
+        }
+    except:
+        return {
+            "summary": "N/A",
+            "oscillators": "N/A",
+            "ma": "N/A"
+        }
 
-# Group by week and compare specific weekdays
-day_returns = df_btc.groupby(["week", "weekday"])["return"].last().unstack()
-returns_filtered = day_returns.dropna(subset=["Monday", "Sunday", "Friday", "Thursday"])
+# Define coins and exchange
+assets = [
+    {"label": "BTC/USD", "symbol": "BTCUSD", "exchange": "COINBASE"},
+    {"label": "ETH/USD", "symbol": "ETHUSD", "exchange": "COINBASE"},
+    {"label": "SOL/USD", "symbol": "SOLUSD", "exchange": "COINBASE"},
+    {"label": "XRP/USD", "symbol": "XRPUSD", "exchange": "COINBASE"}
+]
 
-mon_diff = (returns_filtered["Monday"] - returns_filtered["Sunday"]) * 100
-fri_diff = (returns_filtered["Friday"] - returns_filtered["Thursday"]) * 100
+# Gauge rendering function
+def draw_gauge(title, value):
+    fig, ax = plt.subplots(figsize=(3, 2))
+    ax.axis("off")
+    ax.set_xlim(0, 10)
+    ax.set_ylim(0, 10)
+    ax.text(5, 6.5, title, ha="center", fontsize=12, weight="bold")
+    color = "red" if value == "SELL" or value == "STRONG_SELL" else ("green" if value == "BUY" or value == "STRONG_BUY" else "orange")
+    ax.text(5, 5, value.replace("_", " "), ha="center", fontsize=16, color=color)
+    ax.add_patch(plt.Circle((5, 2), 1.5, color=color, alpha=0.2))
+    return fig
 
-# Bar chart comparison of average differences
-avg_mon_diff = mon_diff.mean()
-avg_fri_diff = fri_diff.mean()
-
-fig, ax = plt.subplots(figsize=(6, 4))
-labels = ["Mon vs Sun", "Fri vs Thu"]
-values = [avg_mon_diff, avg_fri_diff]
-colors = ["green" if v >= 0 else "red" for v in values]
-
-ax.bar(labels, values, color=colors)
-ax.axhline(0, color="gray", linestyle="--")
-ax.set_ylabel("% Change")
-ax.set_title("Average Weekly Return Comparison")
-ax.grid(True, axis="y", linestyle="--", alpha=0.3)
-st.pyplot(fig)
-
-# Summary
-st.markdown("""
-**Summary of average 1-year weekly pattern:**
-- 📈 **Avg Monday vs Sunday**: {:.2f}%
-- 📉 **Avg Friday vs Thursday**: {:.2f}%
-""".format(avg_mon_diff, avg_fri_diff))
+# Display gauges per asset
+for asset in assets:
+    st.subheader(f"📊 {asset['label']}")
+    sentiment = get_sentiment(asset["symbol"], asset["exchange"])
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.pyplot(draw_gauge("Summary", sentiment["summary"]))
+    with col2:
+        st.pyplot(draw_gauge("Oscillators", sentiment["oscillators"]))
+    with col3:
+        st.pyplot(draw_gauge("Moving Averages", sentiment["ma"]))
