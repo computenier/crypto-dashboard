@@ -1,5 +1,5 @@
 streamlit
-requests
-pandas
 matplotlib
-pytrends
+pandas
+requests
+tradingview_ta
