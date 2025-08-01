@@ -198,23 +198,31 @@ with col2:
     st.pyplot(fig2)
 
 # ------------------- Technical Indicator Gauge -------------------
-st.markdown("<div class='section-header'>📉 TradingView Technical Sentiment</div>", unsafe_allow_html=True)
 
+import streamlit as st
+import requests
+import matplotlib.pyplot as plt
+import pandas as pd
 from tradingview_ta import TA_Handler, Interval
 
+st.markdown("<div class='section-header'>📉 TradingView Technical Sentiment</div>", unsafe_allow_html=True)
+
 # Map human labels to TradingView TA interval enums
+# Note: TradingView TA does not natively support 3-month or 1-year intervals.
+# These are mapped to '1mo' as a fallback approximation.
 interval_map = {
     "1h": Interval.INTERVAL_1_HOUR,
     "4h": Interval.INTERVAL_4_HOURS,
     "1d": Interval.INTERVAL_1_DAY,
     "7d": Interval.INTERVAL_1_WEEK,
     "1mo": Interval.INTERVAL_1_MONTH,
-    "3mo": Interval.INTERVAL_3_MONTHS,
-    "1y": Interval.INTERVAL_1_YEAR
+    "3mo": Interval.INTERVAL_1_MONTH,  # Fallback for 3mo
+    "1y": Interval.INTERVAL_1_MONTH     # Fallback for 1y
 }
 
-# Timeframe selection
-selected_interval = st.selectbox("Select timeframe", list(interval_map.keys()), index=2)
+# Timeframe selection (sorted from short to long)
+ordered_intervals = ["1h", "4h", "1d", "7d", "1mo", "3mo", "1y"]
+selected_interval = st.selectbox("Select timeframe", ordered_intervals, index=2)
 selected_tv_interval = interval_map[selected_interval]
 
 @st.cache_data(ttl=600)
@@ -232,7 +240,7 @@ def get_sentiment(symbol, exchange, interval):
             "oscillators": analysis.oscillators["RECOMMENDATION"],
             "ma": analysis.moving_averages["RECOMMENDATION"]
         }
-    except:
+    except Exception as e:
         return {
             "summary": "N/A",
             "oscillators": "N/A",
