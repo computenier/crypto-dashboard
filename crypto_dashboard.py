@@ -260,6 +260,22 @@ def get_average_sentiment(symbol, exchange):
     return "N/A"
 
 @st.cache_data(ttl=600)
+def get_global_data():
+    url = "https://api.coingecko.com/api/v3/global"
+    try:
+        res = requests.get(url)
+        res.raise_for_status()
+        data = res.json()
+        if "data" in data:
+            return data["data"]
+        else:
+            st.warning("Unexpected format from CoinGecko global endpoint.")
+            return {}
+    except requests.RequestException as e:
+        st.error(f"CoinGecko request failed: {e}")
+        return {}
+
+@st.cache_data(ttl=600)
 def get_alt_sentiment_data():
     try:
         url = "https://www.coinglass.com/Bitcoin"
