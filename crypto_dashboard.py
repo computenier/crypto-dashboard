@@ -205,6 +205,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from tradingview_ta import TA_Handler, Interval
 from collections import Counter
+from datetime import datetime
 
 st.markdown("<div class='section-header'>📉 TradingView Technical Sentiment</div>", unsafe_allow_html=True)
 
@@ -260,15 +261,21 @@ def get_average_sentiment(symbol, exchange):
 # Binance Long/Short Sentiment
 @st.cache_data(ttl=600)
 def get_binance_long_short_ratio(symbol="BTCUSDT"):
-    url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={symbol}&period=5m&limit=1"
+    url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={symbol}&period=5m&limit=10"
     try:
         response = requests.get(url).json()
-        if response:
-            long_ratio = float(response[0]["longAccountRatio"])
-            short_ratio = float(response[0]["shortAccountRatio"])
-            return long_ratio, short_ratio
+        data = [
+            {
+                "time": datetime.fromtimestamp(int(d["timestamp"]) / 1000),
+                "long": float(d["longAccountRatio"]),
+                "short": float(d["shortAccountRatio"])
+            }
+            for d in response
+        ]
+        df = pd.DataFrame(data)
+        return df
     except:
-        return None, None
+        return None
 
 # Define coins and exchange
 assets = [
@@ -307,9 +314,12 @@ for asset in assets:
 
 # Binance Long/Short Sentiment Card
 st.markdown("<div class='section-header'>🧭 Binance Trader Sentiment</div>", unsafe_allow_html=True)
-long_ratio, short_ratio = get_binance_long_short_ratio()
-if long_ratio is not None:
-    st.metric("📈 Long Ratio", f"{long_ratio*100:.1f}%")
-    st.metric("📉 Short Ratio", f"{short_ratio*100:.1f}%")
+df_ratio = get_binance_long_short_ratio()
+if df_ratio is not None:
+    st.line_chart(df_ratio.set_index("time")[ ["long", "short"] ])
+    latest = df_ratio.iloc[-1]
+    emoji = "🚀" if latest["long"] > latest["short"] else "⚠️"
+    st.metric("Binance Sentiment (Long %)", f"{latest['long']*100:.1f}%", help="Based on top traders")
+    st.markdown(f"**Flex Signal:** {emoji}")
 else:
     st.warning("Unable to fetch Binance sentiment ratio.")
