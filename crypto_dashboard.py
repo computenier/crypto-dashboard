@@ -211,29 +211,22 @@ def get_btc_daily_1year():
     df = df[["price"]].resample("D").mean().dropna()
     df["return"] = df["price"].pct_change()
     df["weekday"] = df.index.day_name()
+    df["week"] = df.index.to_period("W")
     return df
 
 df_btc = get_btc_daily_1year()
 
-# Compute average return for Monday vs Sunday and Friday vs Thursday
-mon = df_btc[df_btc.index.weekday == 0].copy()
-sun = df_btc[df_btc.index.weekday == 6].copy()
-fri = df_btc[df_btc.index.weekday == 4].copy()
-thurs = df_btc[df_btc.index.weekday == 3].copy()
+# Group by week and compare specific weekdays
+day_returns = df_btc.groupby(["week", "weekday"])["return"].last().unstack()
+returns_filtered = day_returns.dropna(subset=["Monday", "Sunday", "Friday", "Thursday"])
 
-# Merge by week index
-mon_returns = mon["return"].reset_index(drop=True)
-sun_returns = sun["return"].reset_index(drop=True)
-mon_diff = (mon_returns.values - sun_returns.values) * 100
+mon_diff = (returns_filtered["Monday"] - returns_filtered["Sunday"]) * 100
+fri_diff = (returns_filtered["Friday"] - returns_filtered["Thursday"]) * 100
 
-fri_returns = fri["return"].reset_index(drop=True)
-thurs_returns = thurs["return"].reset_index(drop=True)
-fri_diff = (fri_returns.values - thurs_returns.values) * 100
-
-# Plotting chart of comparison
+# Plotting chart
 fig, ax = plt.subplots(figsize=(10, 4))
-ax.plot(mon.index[:len(mon_diff)], mon_diff, label="Monday vs Sunday", color="green")
-ax.plot(fri.index[:len(fri_diff)], fri_diff, label="Friday vs Thursday", color="red")
+ax.plot(mon_diff.index.to_timestamp(), mon_diff, label="Monday vs Sunday", color="green")
+ax.plot(fri_diff.index.to_timestamp(), fri_diff, label="Friday vs Thursday", color="red")
 ax.axhline(0, color="gray", linestyle="--", linewidth=1)
 ax.set_title("% Return Difference on Key Days (1 Year)", fontsize=14)
 ax.set_ylabel("% Change")
@@ -241,7 +234,7 @@ ax.legend()
 ax.grid(True, alpha=0.3)
 st.pyplot(fig)
 
-# Display summary
+# Summary
 st.markdown("""
 **Summary of average 1-year weekly pattern:**
 - 📈 **Avg Monday vs Sunday**: {:.2f}%
