@@ -197,7 +197,7 @@ with col2:
     ax2.axis("equal")
     st.pyplot(fig2)
 
-# ------------------- Technical Indicator Gauge -------------------
+# ------------------- Technical Indicator Gauge + Sentiment -------------------
 
 import streamlit as st
 import requests
@@ -244,7 +244,6 @@ def get_sentiment(symbol, exchange, interval):
             "ma": "N/A"
         }
 
-# New: average sentiment function
 @st.cache_data(ttl=600)
 def get_average_sentiment(symbol, exchange):
     votes = []
@@ -257,6 +256,19 @@ def get_average_sentiment(symbol, exchange):
         most_common = Counter(votes).most_common(1)[0][0]
         return most_common
     return "N/A"
+
+# Binance Long/Short Sentiment
+@st.cache_data(ttl=600)
+def get_binance_long_short_ratio(symbol="BTCUSDT"):
+    url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={symbol}&period=5m&limit=1"
+    try:
+        response = requests.get(url).json()
+        if response:
+            long_ratio = float(response[0]["longAccountRatio"])
+            short_ratio = float(response[0]["shortAccountRatio"])
+            return long_ratio, short_ratio
+    except:
+        return None, None
 
 # Define coins and exchange
 assets = [
@@ -292,3 +304,12 @@ for asset in assets:
         st.pyplot(draw_gauge("Moving Averages", sentiment["ma"]))
     with col4:
         st.pyplot(draw_gauge("Avg Signal", avg_signal))
+
+# Binance Long/Short Sentiment Card
+st.markdown("<div class='section-header'>🧭 Binance Trader Sentiment</div>", unsafe_allow_html=True)
+long_ratio, short_ratio = get_binance_long_short_ratio()
+if long_ratio is not None:
+    st.metric("📈 Long Ratio", f"{long_ratio*100:.1f}%")
+    st.metric("📉 Short Ratio", f"{short_ratio*100:.1f}%")
+else:
+    st.warning("Unable to fetch Binance sentiment ratio.")
