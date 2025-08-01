@@ -171,24 +171,28 @@ except Exception as e:
     st.text(str(e))
 
 # ------------------- Market Dominance Pie Chart -------------------
-st.markdown("<div class='section-header'>📊 Market Dominance Breakdown</div>", unsafe_allow_html=True)
-filter_option = st.selectbox("Select filter:", [
-    "BTC vs ETH vs Others",
-    "BTC vs Altcoins (excluding top 5)"
-])
+st.markdown("<div class='section-header'>📊 Market Dominance Comparison</div>", unsafe_allow_html=True)
 
-if filter_option == "BTC vs ETH vs Others":
-    labels = ["BTC", "ETH", "Others"]
-    values = [btc_dominance, eth_dominance, others]
-else:
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown("**BTC vs ETH vs Others**")
+    labels_1 = ["BTC", "ETH", "Others"]
+    values_1 = [btc_dominance, eth_dominance, others]
+    fig1, ax1 = plt.subplots()
+    ax1.pie(values_1, labels=labels_1, autopct="%1.1f%%", startangle=90)
+    ax1.axis("equal")
+    st.pyplot(fig1)
+
+with col2:
+    st.markdown("**BTC vs Altcoins (excluding Top 5)**")
     top_5_ids = ["bitcoin", "ethereum", "tether", "bnb", "solana"]
     coin_data = get_top_market_data()
     altcoins = [c for c in coin_data if c["id"] not in top_5_ids]
     alt_dominance = sum(c["market_cap"] for c in altcoins) / market_cap * 100
-    labels = ["BTC", "Altcoins (excl. Top 5)"]
-    values = [btc_dominance, alt_dominance]
-
-fig, ax = plt.subplots()
-ax.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
-ax.axis("equal")
-st.pyplot(fig)
+    labels_2 = ["BTC", "Altcoins (excl. Top 5)"]
+    values_2 = [btc_dominance, alt_dominance]
+    fig2, ax2 = plt.subplots()
+    ax2.pie(values_2, labels=labels_2, autopct="%1.1f%%", startangle=90)
+    ax2.axis("equal")
+    st.pyplot(fig2)
