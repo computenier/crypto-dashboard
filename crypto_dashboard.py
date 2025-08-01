@@ -202,13 +202,24 @@ st.markdown("<div class='section-header'>📉 TradingView Technical Sentiment</d
 
 from tradingview_ta import TA_Handler, Interval
 
-@st.cache_data(ttl=3600)
-def get_sentiment(symbol, exchange):
+# Map human labels to TradingView TA interval enums
+interval_map = {
+    "1h": Interval.INTERVAL_1_HOUR,
+    "4h": Interval.INTERVAL_4_HOURS,
+    "1d": Interval.INTERVAL_1_DAY
+}
+
+# Timeframe selection
+selected_interval = st.selectbox("Select timeframe", ["1h", "4h", "1d"], index=2)
+selected_tv_interval = interval_map[selected_interval]
+
+@st.cache_data(ttl=600)
+def get_sentiment(symbol, exchange, interval):
     handler = TA_Handler(
         symbol=symbol,
         screener="crypto",
         exchange=exchange,
-        interval=Interval.INTERVAL_1_DAY
+        interval=interval
     )
     try:
         analysis = handler.get_analysis()
@@ -246,8 +257,8 @@ def draw_gauge(title, value):
 
 # Display gauges per asset
 for asset in assets:
-    st.subheader(f"📊 {asset['label']}")
-    sentiment = get_sentiment(asset["symbol"], asset["exchange"])
+    st.subheader(f"📊 {asset['label']} ({selected_interval})")
+    sentiment = get_sentiment(asset["symbol"], asset["exchange"], selected_tv_interval)
     col1, col2, col3 = st.columns(3)
     with col1:
         st.pyplot(draw_gauge("Summary", sentiment["summary"]))
