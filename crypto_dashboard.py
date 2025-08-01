@@ -196,3 +196,54 @@ with col2:
     ax2.pie(values_2, labels=labels_2, autopct="%1.1f%%", startangle=90)
     ax2.axis("equal")
     st.pyplot(fig2)
+
+# ------------------- BTC Day-of-Week Return Analysis -------------------
+st.markdown("<div class='section-header'>📊 Weekly Price Pattern Analysis</div>", unsafe_allow_html=True)
+
+@st.cache_data(ttl=86400)
+def get_btc_daily_1year():
+    url = "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365"
+    data = requests.get(url).json()
+    prices = data["prices"]
+    df = pd.DataFrame(prices, columns=["timestamp", "price"])
+    df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
+    df.set_index("date", inplace=True)
+    df = df[["price"]].resample("D").mean().dropna()
+    df["return"] = df["price"].pct_change()
+    df["weekday"] = df.index.day_name()
+    return df
+
+df_btc = get_btc_daily_1year()
+
+# Compute average return for Monday vs Sunday and Friday vs Thursday
+mon = df_btc[df_btc.index.weekday == 0].copy()
+sun = df_btc[df_btc.index.weekday == 6].copy()
+fri = df_btc[df_btc.index.weekday == 4].copy()
+thurs = df_btc[df_btc.index.weekday == 3].copy()
+
+# Merge by week index
+mon_returns = mon["return"].reset_index(drop=True)
+sun_returns = sun["return"].reset_index(drop=True)
+mon_diff = (mon_returns.values - sun_returns.values) * 100
+
+fri_returns = fri["return"].reset_index(drop=True)
+thurs_returns = thurs["return"].reset_index(drop=True)
+fri_diff = (fri_returns.values - thurs_returns.values) * 100
+
+# Plotting chart of comparison
+fig, ax = plt.subplots(figsize=(10, 4))
+ax.plot(mon.index[:len(mon_diff)], mon_diff, label="Monday vs Sunday", color="green")
+ax.plot(fri.index[:len(fri_diff)], fri_diff, label="Friday vs Thursday", color="red")
+ax.axhline(0, color="gray", linestyle="--", linewidth=1)
+ax.set_title("% Return Difference on Key Days (1 Year)", fontsize=14)
+ax.set_ylabel("% Change")
+ax.legend()
+ax.grid(True, alpha=0.3)
+st.pyplot(fig)
+
+# Display summary
+st.markdown("""
+**Summary of average 1-year weekly pattern:**
+- 📈 **Avg Monday vs Sunday**: {:.2f}%
+- 📉 **Avg Friday vs Thursday**: {:.2f}%
+""".format(mon_diff.mean(), fri_diff.mean()))
