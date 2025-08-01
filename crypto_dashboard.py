@@ -206,6 +206,7 @@ import pandas as pd
 from tradingview_ta import TA_Handler, Interval
 from collections import Counter
 from datetime import datetime
+from bs4 import BeautifulSoup
 
 st.markdown("<div class='section-header'>📉 TradingView Technical Sentiment</div>", unsafe_allow_html=True)
 
@@ -258,36 +259,36 @@ def get_average_sentiment(symbol, exchange):
         return most_common
     return "N/A"
 
-# Binance Long/Short Sentiment
 @st.cache_data(ttl=600)
-def get_binance_long_short_ratio(symbol="BTCUSDT"):
-    url = f"https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol={symbol}&period=5m&limit=10"
+def get_alt_sentiment_data():
     try:
-        response = requests.get(url)
-        if response.status_code != 200:
-            st.error(f"Binance API returned {response.status_code}")
+        url = "https://www.coinglass.com/Bitcoin"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers)
+        soup = BeautifulSoup(r.text, "html.parser")
+        scripts = soup.find_all("script")
+        for script in scripts:
+            if "longShortRatio" in script.text:
+                raw = script.text
+                break
+        else:
             return None
-
-        json_data = response.json()
-        if not isinstance(json_data, list):
-            st.error("Unexpected Binance response format.")
+        import re, json
+        data = re.search(r'longShortRatio\s*=\s*(\[.*?\])\s*;', raw, re.DOTALL)
+        if not data:
             return None
-
-        data = [
+        parsed = json.loads(data.group(1))
+        df = pd.DataFrame([
             {
-                "time": datetime.fromtimestamp(int(d["timestamp"]) / 1000),
-                "long": float(d["longAccountRatio"]),
-                "short": float(d["shortAccountRatio"])
-            }
-            for d in json_data
-        ]
-        return pd.DataFrame(data)
-    except Exception as e:
-        st.error(f"Error fetching Binance data: {e}")
+                "time": datetime.fromtimestamp(p["time"] / 1000),
+                "long": float(p["longRate"]),
+                "short": float(p["shortRate"])
+            } for p in parsed[-10:]
+        ])
+        return df
+    except:
         return None
 
-
-# Define coins and exchange
 assets = [
     {"label": "BTC/USD", "symbol": "BTCUSD", "exchange": "COINBASE"},
     {"label": "ETH/USD", "symbol": "ETHUSD", "exchange": "COINBASE"},
@@ -295,7 +296,6 @@ assets = [
     {"label": "XRP/USD", "symbol": "XRPUSD", "exchange": "COINBASE"}
 ]
 
-# Gauge rendering function
 def draw_gauge(title, value):
     fig, ax = plt.subplots(figsize=(3, 2))
     ax.axis("off")
@@ -307,7 +307,6 @@ def draw_gauge(title, value):
     ax.add_patch(plt.Circle((5, 2), 1.5, color=color, alpha=0.2))
     return fig
 
-# Display gauges per asset
 for asset in assets:
     st.subheader(f"📊 {asset['label']} ({selected_interval})")
     sentiment = get_sentiment(asset["symbol"], asset["exchange"], selected_tv_interval)
@@ -322,15 +321,13 @@ for asset in assets:
     with col4:
         st.pyplot(draw_gauge("Avg Signal", avg_signal))
 
-# Binance Long/Short Sentiment Card
-st.markdown("<div class='section-header'>🧭 Binance Trader Sentiment</div>", unsafe_allow_html=True)
-df_ratio = get_binance_long_short_ratio()
+st.markdown("<div class='section-header'>📊 Global Trader Sentiment (Coinglass)</div>", unsafe_allow_html=True)
+df_ratio = get_alt_sentiment_data()
 if df_ratio is not None:
     st.line_chart(df_ratio.set_index("time")[ ["long", "short"] ])
     latest = df_ratio.iloc[-1]
     emoji = "🚀" if latest["long"] > latest["short"] else "⚠️"
-    st.metric("Binance Sentiment (Long %)", f"{latest['long']*100:.1f}%", help="Based on top traders")
+    st.metric("Alt Sentiment (Long %)", f"{latest['long']*100:.1f}%", help="Scraped from Coinglass")
     st.markdown(f"**Flex Signal:** {emoji}")
 else:
-    st.warning("Unable to fetch Binance sentiment ratio.")
-
+    st.warning("Unable to fetch Coinglass sentiment.")
